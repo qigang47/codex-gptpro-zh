@@ -1,0 +1,31 @@
+.env
+.env.*
+!.env.example
+
+# Local dependency and build outputs
+node_modules/
+dist/
+build/
+coverage/
+.next/
+
+# Local MCP state, task output, logs, and Codex metadata
+.ai/
+.codex/
+MEMORY.md
+
+# Local project registry and generated backups
+projects.local.json
+projects.*.local.json
+projects.local.json.bak-*
+
+# Generated launchd files can contain absolute local paths
+ops/*.plist
+
+# Local browser/profile data
+.codex-gptpro/
+chrome-user-data/
+
+# OS/editor noise
+.DS_Store
+*.log

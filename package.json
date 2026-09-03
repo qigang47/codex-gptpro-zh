@@ -1,0 +1,43 @@
+{
+  "name": "codex-gptpro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "start:src": "tsx src/index.ts",
+    "setup:auto": "node scripts/bootstrap-local.mjs",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "doctor": "node scripts/doctor.mjs",
+    "healthcheck": "node scripts/healthcheck.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "prod:verify": "pnpm build && pnpm test && pnpm lint && pnpm smoke",
+    "launchd:plist": "node scripts/render-launchd-plist.mjs",
+    "launchd:install": "node scripts/install-launchd.mjs",
+    "launchd:uninstall": "node scripts/uninstall-launchd.mjs",
+    "codex:configure": "node scripts/configure-codex.mjs",
+    "inspect": "npx @modelcontextprotocol/inspector@latest",
+    "tunnel:quick": "cloudflared --config /dev/null tunnel --url http://localhost:8788"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "playwright-core": "^1.61.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
+    "@types/express": "^4.17.25",
+    "@types/node": "^22.19.1",
+    "tsx": "^4.22.4",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}

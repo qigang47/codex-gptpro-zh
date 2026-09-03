@@ -1,0 +1,15 @@
+{
+  "defaultProjectId": "default",
+  "projects": [
+    {
+      "id": "default",
+      "name": "Default project",
+      "repoRoot": "/absolute/path/to/default/repo"
+    },
+    {
+      "id": "another-project",
+      "name": "Another project",
+      "repoRoot": "/absolute/path/to/another/repo"
+    }
+  ]
+}
