@@ -562,6 +562,11 @@ async function selectModelLabel(page: Page, modelLabel: string): Promise<string>
   const effortButton = page
     .locator('button[aria-haspopup="menu"]:visible')
     .filter({ hasText: exactLabel });
+  // New composers show a version and effort (e.g. "6 Pro") while collapsed.
+  // Use this only to open the menu; verify the selected effort inside it below.
+  const versionedEffortButton = page
+    .locator('button[aria-haspopup="menu"]:visible')
+    .filter({ hasText: /^\s*(?:GPT[-\s]*)?\d+(?:\.\d+)?\s*(?:Auto|Instant|Thinking|Pro)\s*$/iu });
   const thinkingButton = page.getByRole("button", {
     name: /^(?:思考强度|思考強度|推理强度|推理強度|Thinking(?: effort| time| strength)?|Reasoning(?: effort)?|思考時間)$/iu,
   });
@@ -586,7 +591,9 @@ async function selectModelLabel(page: Page, modelLabel: string): Promise<string>
     // a subscription badge or a sidebar chat title is never selection evidence.
     if (exactLabel.test("Pro")) {
       for (const panel of await popup.all()) {
-        const slider = panel.getByRole("slider");
+        // The new custom power control hides its ARIA slider from the
+        // accessibility tree, but retains the selected value in the open menu.
+        const slider = panel.getByRole("slider", { includeHidden: true });
         if ((await slider.count()) !== 1 || !(await panel.getByText(exactLabel).count())) continue;
         const value = await slider.getAttribute("aria-valuenow");
         const maximum = await slider.getAttribute("aria-valuemax");
@@ -603,6 +610,8 @@ async function selectModelLabel(page: Page, modelLabel: string): Promise<string>
   }
   if (await thinkingButton.count()) {
     await thinkingButton.first().click({ timeout: 10_000 });
+  } else if (await versionedEffortButton.count()) {
+    await versionedEffortButton.first().click({ timeout: 10_000 });
   } else if (await modelButton.count()) {
     await modelButton.first().click({ timeout: 10_000 });
   } else {
@@ -611,7 +620,7 @@ async function selectModelLabel(page: Page, modelLabel: string): Promise<string>
       const label = (
         (await button.getAttribute("aria-label")) || (await button.innerText())
       ).trim();
-      if (/^(?:Pro$|思考|Thinking|发送|Send|ChatGPT|GPT)/iu.test(label)) {
+      if (/^(?:\d|Pro$|思考|Thinking|发送|Send|ChatGPT|GPT)/iu.test(label)) {
         controls.push({
           label: label.slice(0, 120),
           testId: await button.getAttribute("data-testid"),
@@ -635,7 +644,26 @@ async function selectModelLabel(page: Page, modelLabel: string): Promise<string>
     selected = await selectedLabel();
   }
   if (!selected) {
-    throw new Error(`ChatGPT model selected state could not be verified: ${modelLabel}`);
+    const panels = [];
+    for (const panel of await popup.all()) {
+      const sliders = [];
+      for (const slider of await panel
+        .locator("[aria-valuenow], input, [aria-roledescription]")
+        .all()) {
+        sliders.push({
+          role: await slider.getAttribute("role"),
+          type: await slider.getAttribute("type"),
+          description: await slider.getAttribute("aria-roledescription"),
+          value: await slider.getAttribute("aria-valuenow"),
+          maximum: await slider.getAttribute("aria-valuemax"),
+          text: await slider.getAttribute("aria-valuetext"),
+        });
+      }
+      panels.push({ text: (await panel.innerText()).slice(0, 300), sliders });
+    }
+    throw new Error(
+      `ChatGPT model selected state could not be verified: ${modelLabel}. Panels: ${JSON.stringify(panels)}`,
+    );
   }
   await page.keyboard.press("Escape");
   return selected;

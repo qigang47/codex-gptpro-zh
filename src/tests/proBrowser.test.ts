@@ -13,6 +13,7 @@ type Node = {
   press?: (key: string) => void;
   children?: () => Node[];
   role?: string;
+  hidden?: boolean;
 };
 
 class FixtureLocator {
@@ -63,11 +64,11 @@ class FixtureLocator {
   locator() {
     return new FixtureLocator(() => this.nodes().flatMap((node) => node.children?.() ?? []));
   }
-  getByRole(role: string) {
+  getByRole(role: string, options?: { includeHidden?: boolean }) {
     return new FixtureLocator(() =>
       this.nodes()
         .flatMap((node) => node.children?.() ?? [])
-        .filter((node) => node.role === role),
+        .filter((node) => node.role === role && (!node.hidden || options?.includeHidden)),
     );
   }
   getByText(pattern: RegExp) {
@@ -83,6 +84,8 @@ function fixture(
   options: {
     noModelControl?: boolean;
     collapsedEffort?: boolean;
+    versionedEffort?: string;
+    sliderBelowMaximum?: boolean;
     slider?: boolean;
     localizedSend?: boolean;
     clickDoesNothing?: boolean;
@@ -123,7 +126,7 @@ function fixture(
     },
   };
   const model: Node = {
-    text: () => selected,
+    text: () => options.versionedEffort ?? selected,
     click: () => {
       popupOpen = true;
     },
@@ -143,7 +146,11 @@ function fixture(
   const slider: Node = {
     text: () => "",
     role: "slider",
-    attributes: { "aria-valuenow": "100", "aria-valuemax": "100" },
+    hidden: Boolean(options.versionedEffort),
+    attributes: {
+      "aria-valuenow": options.sliderBelowMaximum ? "75" : "100",
+      "aria-valuemax": "100",
+    },
   };
   const popup: Node = {
     text: () => "Pro",
@@ -181,7 +188,7 @@ function fixture(
         if (selector.includes("model-switcher-dropdown-button"))
           return options.noModelControl || options.slider || options.collapsedEffort ? [] : [model];
         if (selector === 'button[aria-haspopup="menu"]:visible')
-          return options.collapsedEffort ? [model] : [];
+          return options.collapsedEffort || options.versionedEffort ? [model] : [];
         if (selector.includes("aria-checked"))
           return popupOpen && selected === "Pro" && !options.slider ? [option] : [];
         if (selector.includes('[role="menu"]')) return popupOpen ? [popup] : [];
@@ -204,7 +211,7 @@ function fixture(
       new FixtureLocator(() => {
         const controls = [
           send,
-          ...(options.slider ? [thinking] : []),
+          ...(options.slider && !options.versionedEffort ? [thinking] : []),
           ...(options.streaming ? [stop] : []),
         ];
         return controls.filter((node) => name.test(node.text()));
@@ -238,6 +245,25 @@ afterEach(() => {
 });
 
 describe("ChatGPT browser regression checks (no real browser or network)", () => {
+  it.each([
+    "6 Pro",
+    "6Pro",
+    "6\nPro",
+    "GPT-6 Pro",
+    "6 Thinking",
+  ])("opens the versioned %s control and verifies the Pro slider", async (versionedEffort) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    fixture({ versionedEffort, slider: true });
+    expect((await run()).verifiedModelLabel).toBe("Pro");
+  });
+
+  it("does not trust a versioned Pro label when the slider is not at Pro", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const state = fixture({ versionedEffort: "6 Pro", slider: true, sliderBelowMaximum: true });
+    await expect(run()).rejects.toThrow("selected state could not be verified");
+    expect(state.clicks()).toBe(0);
+  });
+
   it("rejects a Pro subscription badge without a selected model control", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const state = fixture({ noModelControl: true });
